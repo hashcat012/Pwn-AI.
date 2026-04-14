@@ -23,12 +23,12 @@ const MODELS = [
   { id: "gpt-5.4", name: "GPT 5.4", logo: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/chatgpt-icon.svg" },
   { id: "nvidia/nemotron-3-super-120b-a12b:free", name: "Nemotron 3 Super", logo: "https://www.nvidia.com/favicon.ico" },
   { id: "z-ai/glm-4.5-air:free", name: "GLM 4.5 Air", logo: "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjQgMjQnIGZpbGw9J25vbmUnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zyc+PHJlY3Qgd2lkdGg9JzI0JyBoZWlnaHQ9JzI0JyByeD0nNCcgZmlsbD0nIzAwMDAwMCcvPjxwYXRoIGQ9J00xMy4yNDAyIDYuNzM5MjZMNS44MDg1OSAxNy4yNjc2SDEwLjc2MjdMMTguMTk0MyA2LjczOTI2SDEzLjI0MDJaTTEzLjE2MDIgMTUuNzE2OEMxMi45MjA2IDE1LjcxNjkgMTIuNjk0NyAxNS44MzY0IDEyLjU2MTUgMTYuMDI5M0wxMS42ODg1IDE3LjI2NzZIMTcuODgxOFYxNS43MTY4SDEzLjE2MDJaTTYuMTIxMDkgOC4yODQxOEgxMC44NDk2QzExLjA4OTMgOC4yODQxMiAxMS4zMTYxIDguMTY0NzUgMTEuNDQ5MiA3Ljk3MTY4TDEyLjMxNDUgNi43MzkyNkg2LjEyMTA5VjguMjg0MThaJyBmaWxsPScjRkZGRkZGJy8+PC9zdmc+" },
-  { id: "minimax/minimax-m2.5:free", name: "Minimax M2.5", logo: "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjQgMjQnIGZpbGw9Im5vbmUiIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zyc+PHJlY3Qgd2lkdGg9JzI0JyBoZWlnaHQ9JzI0JyByeD0nMTInIGZpbGw9JyNmZjY2MDAnLz48cGF0aCBkPSdNMTIuNjIyIDYuNjE1VjE3LjM4NUgxMC4zNTZWOC43NDZMNy43MjkgMTEuODQxTDYuMTAzIDEwLjE5NEwxMS40ODkgNS4zODZIMTIuNjIyVjYuNjE1Wk0xNy44OTcgMTAuMTk0TDEyLjUxMSA1LjM4NkgxMy42NDRMNi42MTVWMTYuNjc2SDExLjQ4OVYxNy4zODVIMTguMTk0VjYuNjE1SDE3Ljg5N1YxMC4xOTRaIiBmaWxsPSJ3aGl0ZSIvPjwvc3dmZz4=" },
+  { id: "minimax/minimax-m2.5:free", name: "Minimax M2.5", logo: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHJ4PSI0IiBmaWxsPSIjMjI1NUZGIi8+PHBhdGggZD0iTTYgMTZWMTBMMTIgMTZMMTggMTBWMTYiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+" },
 ];
 
 const ShieldLogo = ({ className }: { className?: string }) => (
-  <svg viewBox="0 -1 24 26" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 2L3 7v6a12 12 0 0 0 9 11.66A12 12 0 0 0 21 13V7z" />
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     <path d="M9 11l2 2-2 2" />
     <path d="M12 15h3" />
   </svg>
@@ -70,6 +70,7 @@ export default function Chat() {
   const [history, setHistory] = useState<ChatHistory[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const modelSelectorRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const touchTimer = useRef<any>(null);
   const [mobileVisibleId, setMobileVisibleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,8 +80,8 @@ export default function Chat() {
   const [settingsTab, setSettingsTab] = useState("Genel");
   const [isTyping, setIsTyping] = useState(false);
   const [isHoveringLogo, setIsHoveringLogo] = useState(false);
+  const [isHoveringSidebar, setIsHoveringSidebar] = useState(false);
   
-  // Settings States
   const [displayName, setDisplayName] = useState("");
   const [theme, setTheme] = useState("dark");
   const [language, setLanguage] = useState("tr");
@@ -172,7 +173,6 @@ export default function Chat() {
       }
     });
 
-    // Initial check
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setUser(user);
@@ -241,7 +241,6 @@ export default function Chat() {
     const userMessage: Message = { role: "user", content: textToSend };
     let currentMessages = regenerateText ? messages.slice(0, -1) : [...messages, userMessage];
     
-    // Inject uncensored system prompt if empty
     const apiMessages = [
       { role: "system", content: UNCENSORED_PROMPT },
       ...currentMessages.map(m => ({ role: m.role, content: m.content }))
@@ -250,6 +249,7 @@ export default function Chat() {
     if (!regenerateText) {
       setMessages(currentMessages);
       setInput("");
+      if (inputRef.current) inputRef.current.style.height = 'auto';
     } else {
       setMessages(currentMessages);
     }
@@ -260,7 +260,6 @@ export default function Chat() {
     try {
       let chatId = activeChatId;
 
-      // Try to save to Supabase but don't block if it fails
       if (user) {
         try {
           if (!chatId) {
@@ -296,7 +295,6 @@ export default function Chat() {
         }
       }
 
-      // Use Puter.js directly for Gemini, Claude, GPT (browser-based, no auth token needed)
       let assistantContent: string;
       const reqId = Date.now().toString();
       activeRequestRef.current = reqId;
@@ -307,11 +305,9 @@ export default function Chat() {
           if (selectedModel.id.includes("gpt")) puterModel = "gpt-4o";
           else if (selectedModel.id.includes("claude")) puterModel = "claude-3-5-sonnet";
           
-          // Note: Puter.js doesn't officially support AbortController in v2 easily, but we use reqId check
           const response = await (window as any).puter.ai.chat(textToSend, {
             model: puterModel
           });
-          // Puter.js returns {content, extra_content, role} or {message: {content: [...]}}
           let extractedContent: string;
           if (typeof response === 'string') {
             extractedContent = response;
@@ -333,14 +329,15 @@ export default function Chat() {
           throw new Error("Puter.js failed: " + (puterError?.message || JSON.stringify(puterError)));
         }
       } else {
-        // Use backend for other models (OpenRouter)
+        const openRouterPayload = {
+          model: selectedModel.id,
+          messages: apiMessages,
+        };
+
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: apiMessages,
-            model: selectedModel.id
-          }),
+          body: JSON.stringify(openRouterPayload),
           signal: abortControllerRef.current?.signal
         });
 
@@ -362,7 +359,6 @@ export default function Chat() {
       const assistantMessage: Message = { role: "assistant", content: assistantContent, modelId: selectedModel.id, isNew: true };
       setMessages((prev) => [...prev, assistantMessage]);
 
-      // Try to save assistant message
       if (user && chatId) {
         try {
           await supabase.from('messages').insert([{ chat_id: chatId, user_id: user.id, role: 'assistant', content: assistantMessage.content, model_id: selectedModel.id }]);
@@ -382,40 +378,92 @@ export default function Chat() {
     await supabase.auth.signOut();
   };
 
+  const sidebarCls = theme === 'light'
+    ? 'border-black/10 bg-[#F5F5F5]'
+    : 'border-white/5 bg-[#0D0D0D]';
+  const sidebarTextCls = theme === 'light' ? 'text-black' : 'text-white';
+  const sidebarSubCls = theme === 'light' ? 'text-black/40' : 'text-white/40';
+  const sidebarHoverCls = theme === 'light' ? 'hover:bg-black/5' : 'hover:bg-white/5';
+  const sidebarIconCls = (active?: boolean) => theme === 'light'
+    ? (active ? 'bg-black/10 text-black' : 'text-black/50 hover:text-black')
+    : (active ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white');
+  const inputCls = theme === 'light'
+    ? 'bg-black/5 border-black/10 text-black placeholder:text-black/30 focus:border-black/30'
+    : 'bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-white/20';
+  const chatBg = theme === 'light' ? 'bg-[#FAFAFA] text-black' : 'bg-[#050505] text-white';
+  const msgInputWrapCls = theme === 'light'
+    ? 'bg-white border-black/10 shadow-lg'
+    : 'bg-white/[0.03] border-white/10';
+  const userBubbleCls = theme === 'light' ? 'bg-black text-white' : 'bg-white/10 text-white';
+  const aiBubbleCls = theme === 'light'
+    ? 'bg-white border border-black/10 text-black shadow-md'
+    : 'bg-white/[0.02] border border-white/[0.08]';
+  const dropdownCls = theme === 'light'
+    ? 'bg-white border-black/10 text-black'
+    : 'bg-[#1A1A1A] border-white/10 text-white';
+
   return (
-    <div className="h-screen flex bg-[#0A0A0A] text-white overflow-hidden">
-      {/* Sidebar */}
+    <div className={`h-screen flex overflow-hidden ${theme === 'light' ? 'bg-[#FAFAFA] text-black' : 'bg-[#0A0A0A] text-white'}`}>
       <motion.aside 
         initial={false}
-        animate={{ width: sidebarOpen ? 300 : 80 }}
-        className="flex-shrink-0 border-r border-white/5 bg-[#0D0D0D] flex flex-col overflow-hidden relative z-50"
+        animate={{ width: sidebarOpen ? 300 : 72 }}
+        onMouseEnter={() => setIsHoveringSidebar(true)}
+        onMouseLeave={() => setIsHoveringSidebar(false)}
+        className={`flex-shrink-0 border-r ${sidebarCls} flex flex-col overflow-hidden relative z-50`}
       >
-        <div className={`p-6 flex items-center justify-between ${!sidebarOpen ? "flex-col gap-8 px-0" : ""}`}>
-          <div 
-            className="relative cursor-pointer"
-            onMouseEnter={() => setIsHoveringLogo(true)}
-            onMouseLeave={() => setIsHoveringLogo(false)}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-          >
-             <AnimatePresence mode="wait">
-                {isHoveringLogo ? (
-                   <motion.div key="toggle" initial={{rotate:-90, opacity:0, scale:0.8}} animate={{rotate:0, opacity:1, scale:1}} exit={{rotate:90, opacity:0, scale:0.8}} transition={{duration:0.25, ease: "easeInOut"}}>
-                      <PanelLeftIcon className="w-8 h-8 text-white/60 hover:text-white" />
-                   </motion.div>
-                ) : (
-                   <motion.div key="logo" initial={{scale:0.8, opacity:0}} animate={{scale:1, opacity:1}} exit={{scale:0.8, opacity:0}} transition={{duration:0.25, ease: "easeInOut"}} className="flex items-center gap-3">
-                      <ShieldLogo className="w-8 h-8 text-white" />
-                      {sidebarOpen && <div className="text-xl font-bold tracking-tighter">Pwn AI.</div>}
-                   </motion.div>
-                )}
-             </AnimatePresence>
-          </div>
+        {/* Header */}
+        <div className={`px-5 py-4 flex items-center border-b flex-shrink-0 ${
+          sidebarOpen ? 'justify-between' : 'justify-center'
+        } ${theme === 'light' ? 'border-black/5' : 'border-white/5'}`}>
+          {sidebarOpen ? (
+            <>
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <ShieldLogo className={`w-7 h-7 flex-shrink-0 ${sidebarTextCls}`} />
+                <span className={`text-lg font-bold tracking-tight truncate ${sidebarTextCls}`}>Pwn AI.</span>
+              </div>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className={`p-2 rounded-lg transition-colors flex-shrink-0 ${sidebarHoverCls} ${sidebarSubCls}`}
+              >
+                <PanelLeftIcon className="w-5 h-5" />
+              </button>
+            </>
+          ) : (
+            <AnimatePresence mode="wait">
+              {isHoveringSidebar ? (
+                <motion.button
+                  key="panel"
+                  initial={{ opacity: 0, scale: 0.7, rotate: -20 }}
+                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                  exit={{ opacity: 0, scale: 0.7, rotate: 20 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  onClick={() => setSidebarOpen(true)}
+                  className={`flex items-center justify-center w-9 h-9 rounded-xl transition-colors ${sidebarHoverCls} ${sidebarTextCls}`}
+                >
+                  <PanelLeftIcon className="w-6 h-6" />
+                </motion.button>
+              ) : (
+                <motion.div
+                  key="shield"
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.7 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  className="flex items-center justify-center w-9 h-9"
+                >
+                  <ShieldLogo className={`w-7 h-7 ${sidebarTextCls}`} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
         </div>
 
-        <div className={`px-4 mb-6 ${!sidebarOpen ? "px-2" : ""}`}>
+        <div className={`px-4 mt-4 mb-3`}>
           <button 
             onClick={startNewChat}
-            className={`flex items-center justify-center gap-3 py-3 bg-white text-black rounded-xl font-bold hover:bg-white/90 transition-all ${sidebarOpen ? "w-full px-4" : "w-12 h-12 mx-auto"}`}
+            className={`flex items-center justify-center gap-3 py-3 rounded-xl font-bold transition-all ${
+              theme === 'light' ? 'bg-black text-white hover:bg-black/80' : 'bg-white text-black hover:bg-white/90'
+            } ${sidebarOpen ? "w-full px-4" : "w-10 h-10 mx-auto"}`}
             title="New Chat"
           >
             <Plus className="w-5 h-5" />
@@ -423,130 +471,134 @@ export default function Chat() {
           </button>
         </div>
 
-        {sidebarOpen ? (
-          <div className="px-4 mb-4 relative animate-in fade-in duration-300">
-            <Search className="w-4 h-4 absolute left-8 top-1/2 -translate-y-1/2 text-white/40" />
+        {sidebarOpen && (
+          <div className="px-4 mb-3 relative">
+            <Search className={`w-4 h-4 absolute left-8 top-1/2 -translate-y-1/2 ${sidebarSubCls}`} />
             <input 
               type="text"
               placeholder="Sohbetlerde ara..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-white/20 transition-all text-white placeholder:text-white/30"
+              className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none transition-all ${inputCls}`}
             />
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-6 mb-4">
-             <button onClick={() => setSidebarOpen(true)} className="p-3 hover:bg-white/5 rounded-xl text-white/40 hover:text-white transition-all">
-               <Search className="w-5 h-5" />
-             </button>
           </div>
         )}
 
+        {/* History list — only when open */}
         <div className={`flex-1 overflow-y-auto px-4 space-y-1 ${!sidebarOpen ? "hidden" : ""}`}>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-white/20 px-4 mb-2">History</div>
+          <div className={`text-[10px] font-bold uppercase tracking-widest px-4 mb-2 ${sidebarSubCls}`}>History</div>
           {history.length === 0 ? (
-            <div className="px-4 py-8 text-center text-xs text-white/20">No chats yet</div>
+            <div className={`px-4 py-8 text-center text-xs ${sidebarSubCls}`}>No chats yet</div>
           ) : (
-            history.filter((h) => h.title.toLowerCase().includes(searchQuery.toLowerCase())).map((item) => (
-              <div 
-                key={item.id} 
-                className={`w-full flex items-center px-2 py-2 rounded-xl transition-colors text-left group relative cursor-pointer ${activeChatId === item.id ? "bg-white/10" : "hover:bg-white/5"}`}
-                onTouchStart={() => {
-                  touchTimer.current = setTimeout(() => setMobileVisibleId(item.id), 500);
-                }}
-                onTouchEnd={() => {
-                  if (touchTimer.current) clearTimeout(touchTimer.current);
-                }}
-                onTouchMove={() => {
-                  if (touchTimer.current) clearTimeout(touchTimer.current);
-                }}
-                onClick={() => loadChat(item.id)}
-              >
-                <div className="flex-1 truncate px-2 text-left">
-                  <div className="text-sm font-medium truncate flex items-center gap-2">
-                    {(item as any).pinned && <Pin className="w-3 h-3 text-white/60" />}
-                    {item.title}
+            history
+              .filter((h) => h.title.toLowerCase().includes(searchQuery.toLowerCase()))
+              .map((item, idx) => (
+                <div
+                  key={`${item.id || idx}`}
+                  className={`w-full flex items-center px-2 py-2 rounded-xl transition-colors text-left group relative cursor-pointer ${
+                    activeChatId === item.id
+                      ? (theme === 'light' ? 'bg-black/10' : 'bg-white/10')
+                      : sidebarHoverCls
+                  }`}
+                  onClick={() => loadChat(item.id)}
+                >
+                  <div className="flex-1 truncate px-2 text-left">
+                    <div className={`text-sm font-medium truncate flex items-center gap-2 ${sidebarTextCls}`}>
+                      {(item as any).pinned && <Pin className={`w-3 h-3 ${sidebarSubCls}`} />}
+                      {item.title}
+                    </div>
+                    <div className={`text-[10px] ${sidebarSubCls}`}>{new Date(item.created_at).toLocaleDateString()}</div>
                   </div>
-                  <div className="text-[10px] text-white/20">{new Date(item.created_at).toLocaleDateString()}</div>
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDropdownId(dropdownId === item.id ? null : item.id); }}
+                      className={`p-2 rounded-lg transition-all ${sidebarSubCls} ${sidebarHoverCls} ${dropdownId === item.id || activeChatId === item.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                    <AnimatePresence>
+                      {dropdownId === item.id && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className={`absolute right-0 top-10 border rounded-xl shadow-2xl z-50 w-44 overflow-hidden flex flex-col py-1 ${dropdownCls}`}
+                        >
+                          <button onClick={(e) => { e.stopPropagation(); togglePin(item.id, !!(item as any).pinned); }} className={`px-3 py-2 text-xs text-left flex items-center gap-3 ${sidebarHoverCls}`}>
+                            <Pin className="w-4 h-4" /> {(item as any).pinned ? 'Sabitlemeyi Kaldır' : 'Sohbeti Sabitle'}
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); renameChat(item.id, item.title); }} className={`px-3 py-2 text-xs text-left flex items-center gap-3 ${sidebarHoverCls}`}>
+                            <Edit2 className="w-4 h-4" /> Yeniden Adlandır
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); deleteChat(item.id); }} className="px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 text-left flex items-center gap-3">
+                            <Trash className="w-4 h-4" /> Sohbeti Sil
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
-                <div className="relative">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDropdownId(dropdownId === item.id ? null : item.id); }}
-                    className={`p-2 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-all ${dropdownId === item.id || activeChatId === item.id || mobileVisibleId === item.id ? "opacity-100" : "opacity-0 group-hover:opacity-100 md:opacity-0 active:opacity-100"}`}
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-                  <AnimatePresence>
-                    {dropdownId === item.id && (
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="absolute right-0 top-10 bg-[#1A1A1A] border border-white/10 rounded-xl shadow-2xl z-50 w-44 overflow-hidden flex flex-col py-1"
-                      >
-                        <button onClick={(e) => { e.stopPropagation(); togglePin(item.id, !!(item as any).pinned); }} className="px-3 py-2 text-xs text-white/80 hover:bg-white/5 hover:text-white text-left flex items-center gap-3">
-                          <Pin className="w-4 h-4" /> {(item as any).pinned ? "Sabitlemeyi Kaldır" : "Sohbeti Sabitle"}
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); renameChat(item.id, item.title); }} className="px-3 py-2 text-xs text-white/80 hover:bg-white/5 hover:text-white text-left flex items-center gap-3">
-                          <Edit2 className="w-4 h-4" /> Yeniden Adlandır
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteChat(item.id); }} className="px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 text-left flex items-center gap-3">
-                          <Trash className="w-4 h-4" /> Sohbeti Sil
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-            ))
+              ))
           )}
         </div>
 
-        {/* Profile Section */}
-        <div className={`p-4 border-t border-white/5 bg-[#0F0F0F] relative ${!sidebarOpen ? "p-2" : ""}`}>
-          <div onClick={() => setProfileDropdownOpen(!profileDropdownOpen)} className={`flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group ${!sidebarOpen ? "justify-center p-2" : ""}`}>
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10 flex-shrink-0">
+        {/* Profile — always at the bottom */}
+        <div className={`flex-shrink-0 border-t ${theme === 'light' ? 'border-black/5' : 'border-white/5'} relative`}>
+          <div
+            onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+            className={`flex items-center gap-3 p-4 transition-colors cursor-pointer group ${sidebarHoverCls} ${!sidebarOpen ? 'justify-center' : ''}`}
+          >
+            <div className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden border ${
+              theme === 'light' ? 'border-black/10 bg-black/5' : 'border-white/10 bg-white/10'
+            }`}>
               {user?.user_metadata?.avatar_url ? (
                 <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                 <div className="w-full h-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs uppercase">
-                  {user?.email ? user.email.charAt(0) : <User className="w-5 h-5 text-white/40" />}
+                  {user?.email ? user.email.charAt(0) : <User className="w-5 h-5" />}
                 </div>
               )}
             </div>
             {sidebarOpen && (
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold truncate">{user?.email?.split('@')[0] || "User"}</div>
-                <div className="text-[10px] text-white/40 truncate">{user?.email}</div>
-              </div>
-            )}
-            {sidebarOpen && (
-              <button onClick={(e) => { e.stopPropagation(); setProfileDropdownOpen(!profileDropdownOpen); }} className="p-2 opacity-0 group-hover:opacity-100 hover:bg-white/10 rounded-lg transition-all">
-                <Settings className="w-4 h-4 text-white/40 group-hover:text-white" />
-              </button>
+              <>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-bold truncate ${sidebarTextCls}`}>{user?.email?.split('@')[0] || 'User'}</div>
+                  <div className={`text-[10px] truncate ${sidebarSubCls}`}>{user?.email}</div>
+                </div>
+                <Settings className={`w-4 h-4 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all ${sidebarSubCls}`} />
+              </>
             )}
           </div>
-          
+
           <AnimatePresence>
             {profileDropdownOpen && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className={`absolute bottom-full mb-2 w-64 bg-[#1A1A1A] border border-white/10 rounded-xl shadow-2xl p-1 z-50 ${!sidebarOpen ? "left-12" : "left-4"}`}>
-                 <button onClick={() => {setSettingsOpen(true); setProfileDropdownOpen(false);}} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 rounded-lg text-sm text-white/80 hover:text-white">
-                   <Settings className="w-4 h-4" /> Ayarlar
-                 </button>
-                 <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-red-500/10 text-red-500 rounded-lg text-sm mt-1">
-                   <LogOut className="w-4 h-4" /> Çıkış Yap
-                 </button>
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className={`absolute bottom-full mb-2 w-52 border rounded-2xl shadow-2xl p-1.5 z-50 ${
+                  dropdownCls
+                } ${!sidebarOpen ? 'left-1' : 'left-3'}`}
+              >
+                <button
+                  onClick={() => { setSettingsOpen(true); setProfileDropdownOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left transition-colors ${sidebarHoverCls}`}
+                >
+                  <Settings className="w-4 h-4" /> Ayarlar
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-red-500/10 text-red-500 rounded-xl text-sm text-left transition-colors"
+                >
+                  <LogOut className="w-4 h-4" /> Çıkış Yap
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </motion.aside>
 
-      {/* Main Chat Area */}
-      <div className={`flex-1 flex flex-col relative transition-colors duration-500 ${theme === 'light' ? 'bg-[#F8F9FA] text-black' : 'bg-[#050505] text-white'}`}>
-        <div className={`absolute inset-0 liquid-bg pointer-events-none opacity-20 ${theme === 'light' ? 'hidden' : ''}`} />
-        
-        {/* Messages */}
+      <div className={`flex-1 flex flex-col relative transition-colors duration-300 ${chatBg}`}>
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-8 scroll-smooth relative z-10 font-sans">
           <div className="max-w-4xl mx-auto w-full">
             <AnimatePresence initial={false}>
@@ -556,13 +608,13 @@ export default function Chat() {
                   animate={{ opacity: 1, y: 0 }}
                   className="h-[70vh] flex flex-col items-center justify-center text-center"
                 >
-                  <ShieldLogo className="w-16 h-16 text-white mb-6" />
+                  <ShieldLogo className={`w-16 h-16 mb-6 ${theme === 'light' ? 'text-black' : 'text-white'}`} />
                   <h2 className="text-4xl font-bold mb-4 tracking-tight">How can I help you today?</h2>
                 </motion.div>
               )}
               {messages.map((msg, i) => (
                 <motion.div
-                  key={i}
+                  key={`${msg.role}-${i}-${msg.content.slice(0, 20)}`}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex gap-6 mb-8 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -585,11 +637,11 @@ export default function Chat() {
                       )}
                     </div>
                     {msg.role === "user" ? (
-                      <div className={`p-5 rounded-[2rem] leading-relaxed text-base font-medium break-words shadow-xl ${theme === 'light' ? 'bg-black text-white' : 'bg-white/10 text-white'}`}>
+                      <div className={`p-5 rounded-[2rem] leading-relaxed text-base font-medium break-words ${userBubbleCls}`}>
                         {msg.content}
                       </div>
                     ) : (
-                      <div className="py-4 px-6 rounded-[2.5rem] leading-relaxed text-base font-normal flex-1 min-w-0 glass-card">
+                      <div className={`py-4 px-6 rounded-[2.5rem] leading-relaxed text-base font-normal flex-1 min-w-0 ${aiBubbleCls}`}>
                          {msg.isNew ? (
                            <TypingEffect 
                              content={msg.content} 
@@ -603,11 +655,11 @@ export default function Chat() {
                            <span className="whitespace-pre-wrap block">{msg.content}</span>
                          )}
                          <div className="flex items-center gap-1 mt-4 opacity-50 hover:opacity-100 transition-opacity">
-                           <button title="Kopyala" onClick={() => navigator.clipboard.writeText(msg.content)} className="flex flex-shrink-0 items-center justify-center w-8 h-8 rounded-lg text-white hover:bg-white/10 transition-colors">
+                           <button title="Kopyala" onClick={() => navigator.clipboard.writeText(msg.content)} className="flex flex-shrink-0 items-center justify-center w-8 h-8 rounded-lg hover:bg-black/10 transition-colors">
                               <Copy className="w-4 h-4" />
                            </button>
                            {i === messages.length - 1 && messages.length > 1 && messages[i-1]?.role === "user" && (
-                             <button title="Yeniden Oluştur" onClick={() => handleSend(undefined, messages[i-1].content)} className="flex flex-shrink-0 items-center justify-center w-8 h-8 rounded-lg text-white hover:bg-white/10 transition-colors">
+                             <button title="Yeniden Oluştur" onClick={() => handleSend(undefined, messages[i-1].content)} className="flex flex-shrink-0 items-center justify-center w-8 h-8 rounded-lg hover:bg-black/10 transition-colors">
                                 <RefreshCcw className="w-4 h-4" />
                              </button>
                            )}
@@ -626,7 +678,7 @@ export default function Chat() {
                   {error}
                 </motion.div>
               )}
-              {loading && (
+              {loading && !isTyping && (
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -637,8 +689,7 @@ export default function Chat() {
                       <img src={selectedModel.logo} alt="" className="w-8 h-8 rounded-sm object-contain" referrerPolicy="no-referrer" />
                     </div>
                     <div className="py-2 flex items-center gap-3">
-                      <span className="text-white/50 text-sm font-medium animate-pulse">Pwn AI düşünüyor</span>
-                      <span className="loader scale-75" />
+                      <span className="text-sm font-medium animate-pulse">Pwn AI düşünüyor</span>
                     </div>
                   </div>
                 </motion.div>
@@ -647,17 +698,24 @@ export default function Chat() {
           </div>
         </div>
 
-      {/* Input Area */}
-      <div className="p-6 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A] to-transparent">
+      <div className={`p-6 ${theme === 'light' ? 'bg-gradient-to-t from-[#FAFAFA] via-[#FAFAFA] to-transparent' : 'bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A] to-transparent'}`}>
         <div className="max-w-4xl mx-auto relative group">
           <form onSubmit={handleSend} className="relative">
-            <div className="flex flex-col bg-white/5 border border-white/10 rounded-2xl focus-within:border-white/20 transition-all shadow-2xl" ref={modelSelectorRef}>
-              <input 
-                type="text"
+            <div className={`flex flex-col border rounded-2xl focus-within:border-black/20 transition-all shadow-2xl ${theme === 'light' ? 'bg-white border-black/10' : 'bg-white/5 border-white/10'}`} ref={modelSelectorRef}>
+              <textarea 
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                 placeholder="Message Pwn AI..."
-                className="w-full bg-transparent py-6 pl-8 pr-20 focus:outline-none text-lg"
+                className={`w-full bg-transparent py-6 pl-8 pr-20 focus:outline-none text-lg resize-none ${theme === 'light' ? 'text-black' : 'text-white'}`}
+                rows={1}
+                style={{ height: 'auto' }}
+                onInput={(e) => {
+                  const t = e.currentTarget;
+                  t.style.height = 'auto';
+                  t.style.height = Math.min(t.scrollHeight, 192) + 'px';
+                }}
               />
               
               <div className="flex items-center justify-between px-4 pb-4">
@@ -709,7 +767,7 @@ export default function Chat() {
                   <button 
                     onClick={handleStop}
                     type="button"
-                    className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 text-white flex items-center justify-center hover:bg-white/20 transition-all flex-shrink-0 shadow-lg"
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all flex-shrink-0 border ${theme === 'light' ? 'bg-black/5 border-black/20 text-black hover:bg-black/10' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
                   >
                     <Square className="w-3 h-3 fill-current" />
                   </button>
@@ -717,7 +775,7 @@ export default function Chat() {
                   <button 
                     type="submit"
                     disabled={!input.trim()}
-                    className={`w-10 h-10 flex items-center justify-center transition-all disabled:opacity-50 disabled:scale-95 flex-shrink-0 group ${theme === 'light' ? 'text-black' : 'text-white'}`}
+                    className={`w-10 h-10 flex items-center justify-center transition-all disabled:opacity-30 disabled:scale-95 flex-shrink-0 ${theme === 'light' ? 'text-black' : 'text-white'}`}
                   >
                     <CircleArrowUp02Icon className="w-9 h-9" strokeWidth={1} />
                   </button>

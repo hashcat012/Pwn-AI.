@@ -103,28 +103,30 @@ async function startServer() {
     }
 
     if (!apiKey) {
+      console.error("OpenRouter API Key missing!");
       return res.status(500).json({ error: "OPENROUTER_API_KEY is not set" });
     }
+    console.log(`Backend Using API Key starting with: ${apiKey.substring(0, 10)}...`);
 
     try {
       let targetModel = model || "openai/gpt-oss-120b:free";
       
-      // Map user-requested IDs to verified OpenRouter IDs
       const modelMapping: Record<string, string> = {
-        // Legacy/previous incorrect IDs -> official current IDs
         "nvidia/nemotron-4-340b-instruct:free": "nvidia/nemotron-3-super-120b-a12b:free",
         "zhipu/glm-4-9b-chat:free": "z-ai/glm-4.5-air:free",
-        "sophosympatheia/rogue-rose-103b-v0.2:free": "openai/gpt-oss-120b:free",
         "minimax/minimax-abab6.5s:free": "minimax/minimax-m2.5:free",
       };
 
-      if (modelMapping[targetModel]) {
-        console.log(`Mapping ${targetModel} to ${modelMapping[targetModel]}`);
-        targetModel = modelMapping[targetModel];
-      }
+      if (modelMapping[targetModel]) targetModel = modelMapping[targetModel];
 
-      console.log(`Calling OpenRouter with model: ${targetModel}`);
-      
+      console.log(`Calling OpenRouter: model=${targetModel}, messages=${messages?.length}`);
+      console.log(`Key prefix: ${apiKey.substring(0, 14)}`);
+
+      const orBody = {
+        model: targetModel,
+        messages: Array.isArray(messages) ? messages : [],
+      };
+
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -132,20 +134,19 @@ async function startServer() {
           "Content-Type": "application/json",
           "HTTP-Referer": safeReferer,
           "X-Title": "Pwn AI",
+          "X-OpenRouter-Require-Provider": "false",
         },
-        body: JSON.stringify({
-          model: targetModel,
-          messages: messages,
-        }),
+        body: JSON.stringify(orBody),
       });
 
       const data = await response.json();
       
       if (!response.ok) {
-        console.error("OpenRouter API Error Response:", JSON.stringify(data, null, 2));
+        console.error(`OpenRouter Error ${response.status}:`, JSON.stringify(data));
+        const errDetail = data?.error?.message || data?.error || JSON.stringify(data);
         return res.status(response.status).json({ 
-          error: "OpenRouter API Error", 
-          details: data.error?.message || JSON.stringify(data) 
+          error: `OpenRouter API Error (${response.status})`, 
+          details: errDetail
         });
       }
 
