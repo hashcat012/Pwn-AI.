@@ -46,6 +46,9 @@ async function startServer() {
       process.env.APP_URL ||
       "http://localhost:3000";
     
+    // Safety: ensure no extra whitespace in referer
+    const safeReferer = String(referer).trim();
+    
     // 1) Gemini route via Google SDK (requires GEMINI_API_KEY)
     if (typeof model === "string" && model.includes("gemini")) {
       try {
@@ -127,7 +130,7 @@ async function startServer() {
         headers: {
           "Authorization": `Bearer ${apiKey.trim()}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": referer,
+          "HTTP-Referer": safeReferer,
           "X-Title": "Pwn AI",
         },
         body: JSON.stringify({
