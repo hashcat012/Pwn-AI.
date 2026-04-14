@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, User, Bot, LogOut, MessageSquare, Plus, Settings, Search, ChevronLeft, Menu, MoreHorizontal, Trash, Pin, Edit2 } from "lucide-react";
+import { Send, User, Bot, LogOut, MessageSquare, Plus, Settings, Search, ChevronLeft, Menu, MoreHorizontal, Trash, Pin, Edit2, Copy, RefreshCcw } from "lucide-react";
 import { PanelLeftIcon } from "hugeicons-react";
 import { supabase } from "../lib/supabase";
 
@@ -8,6 +8,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   modelId?: string;
+  isNew?: boolean;
 }
 
 interface ChatHistory {
@@ -24,6 +25,20 @@ const MODELS = [
   { id: "z-ai/glm-4.5-air:free", name: "GLM 4.5 Air", logo: "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PScwIDAgMjQgMjQnIGZpbGw9J25vbmUnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zyc+PHJlY3Qgd2lkdGg9JzI0JyBoZWlnaHQ9JzI0JyByeD0nNCcgZmlsbD0nIzAwMDAwMCcvPjxwYXRoIGQ9J00xMy4yNDAyIDYuNzM5MjZMNS44MDg1OSAxNy4yNjc2SDEwLjc2MjdMMTguMTk0MyA2LjczOTI2SDEzLjI0MDJaTTEzLjE2MDIgMTUuNzE2OEMxMi45MjA2IDE1LjcxNjkgMTIuNjk0NyAxNS44MzY0IDEyLjU2MTUgMTYuMDI5M0wxMS42ODg1IDE3LjI2NzZIMTcuODgxOFYxNS43MTY4SDEzLjE2MDJaTTYuMTIxMDkgOC4yODQxOEgxMC44NDk2QzExLjA4OTMgOC4yODQxMiAxMS4zMTYxIDguMTY0NzUgMTEuNDQ5MiA3Ljk3MTY4TDEyLjMxNDUgNi43MzkyNkg2LjEyMTA5VjguMjg0MThaJyBmaWxsPScjRkZGRkZGJy8+PC9zdmc+" },
   { id: "minimax/minimax-m2.5:free", name: "Minimax M2.5", logo: "https://www.minimaxi.com/favicon.ico" },
 ];
+
+const TypingEffect = ({ content, speed = 10 }: { content: string, speed?: number }) => {
+  const [displayed, setDisplayed] = useState("");
+  useEffect(() => {
+    let i = 0;
+    const interval = setInterval(() => {
+      setDisplayed(content.slice(0, i));
+      i += 3;
+      if (i > content.length + 3) clearInterval(interval);
+    }, speed);
+    return () => clearInterval(interval);
+  }, [content, speed]);
+  return <span className="whitespace-pre-wrap">{displayed}</span>;
+};
 
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -92,18 +107,28 @@ export default function Chat() {
         { model: "gpt-4o-mini" }
       );
       let title = "";
-      if (typeof response === 'string') title = response;
-      else if (response?.message?.content && Array.isArray(response.message.content)) title = response.message.content.map((c: any) => c?.text || "").join("");
-      else if (response?.content) title = response.content;
-      else if (response?.message) title = response.message;
-      else if (response?.text) title = response.text;
-      else if (response?.extra_content) title = response.extra_content;
+      if (typeof response === 'string') {
+        title = response;
+      } else if (response) {
+        if (typeof response.text === "string") {
+          title = response.text;
+        } else if (response.message) {
+          if (typeof response.message === "string") title = response.message;
+          else if (typeof response.message.content === "string") title = response.message.content;
+          else if (Array.isArray(response.message.content)) title = response.message.content.map((c: any) => c?.text || "").join("");
+        } else if (typeof response.content === "string") {
+          title = response.content;
+        } else if (typeof response.extra_content === "string") {
+          title = response.extra_content;
+        }
+      }
 
-      title = title.replace(/['"]/g, '').trim();
-      if (title.length > 40) title = title.slice(0, 40) + "...";
-      if (title.toLowerCase().startsWith("başlık:")) title = title.substring(7).trim();
-      if (title) {
-        await supabase.from('chats').update({ title }).eq('id', chatId);
+      let titleStr = String(title || prompt || "Yeni Sohbet").replace(/['"]/g, '').trim();
+      if (titleStr.length > 40) titleStr = titleStr.slice(0, 40) + "...";
+      if (titleStr.toLowerCase().startsWith("başlık:")) titleStr = titleStr.substring(7).trim();
+      titleStr = titleStr.charAt(0).toUpperCase() + titleStr.slice(1);
+      if (titleStr) {
+        await supabase.from('chats').update({ title: titleStr }).eq('id', chatId);
         fetchHistory(userId);
       }
     } catch (e) {
@@ -184,7 +209,7 @@ export default function Chat() {
       setMessages([]);
       return;
     }
-    if (data) setMessages(data.map(m => ({ role: m.role, content: m.content })));
+    if (data) setMessages(data.map(m => ({ role: m.role, content: m.content, modelId: m.model_id, isNew: false })));
   };
 
   const startNewChat = () => {
@@ -200,15 +225,23 @@ export default function Chat() {
 
   const [error, setError] = useState<string | null>(null);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  const handleSend = async (e?: React.FormEvent, regenerateText?: string) => {
+    if (e) e.preventDefault();
+    const textToSend = regenerateText || input;
+    if (!textToSend.trim() || loading) return;
     setError(null);
 
-    const userMessage: Message = { role: "user", content: input };
-    const currentMessages = [...messages, userMessage];
-    setMessages(currentMessages);
-    setInput("");
+    let currentMessages = messages;
+    if (!regenerateText) {
+      const userMessage: Message = { role: "user", content: textToSend };
+      currentMessages = [...messages, userMessage];
+      setMessages(currentMessages);
+      setInput("");
+    } else {
+      currentMessages = messages.slice(0, -1);
+      setMessages(currentMessages);
+    }
+    
     setLoading(true);
 
     try {
@@ -220,7 +253,7 @@ export default function Chat() {
           if (!chatId) {
             const { data: newChat, error: chatError } = await supabase
               .from('chats')
-              .insert([{ user_id: user.id, title: input.slice(0, 30) + "..." }])
+              .insert([{ user_id: user.id, title: "Yeni Sohbet" }])
               .select()
               .single();
 
@@ -228,12 +261,12 @@ export default function Chat() {
               chatId = newChat.id;
               setActiveChatId(chatId);
               fetchHistory(user.id);
-              generateTitle(input, chatId, user.id);
+              generateTitle(textToSend, chatId, user.id);
             }
           }
 
           if (chatId) {
-            await supabase.from('messages').insert([{ chat_id: chatId, user_id: user.id, role: 'user', content: input }]);
+            await supabase.from('messages').insert([{ chat_id: chatId, user_id: user.id, role: 'user', content: textToSend }]);
           }
         } catch (dbErr) {
           console.warn("Database save failed, continuing with AI only:", dbErr);
@@ -295,7 +328,7 @@ export default function Chat() {
         }
       }
 
-      const assistantMessage: Message = { role: "assistant", content: assistantContent, modelId: selectedModel.id };
+      const assistantMessage: Message = { role: "assistant", content: assistantContent, modelId: selectedModel.id, isNew: true };
       setMessages((prev) => [...prev, assistantMessage]);
 
       // Try to save assistant message
@@ -470,7 +503,7 @@ export default function Chat() {
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex gap-6 mb-8 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <div className={`flex gap-4 max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                  <div className={`flex gap-4 w-full max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
                     <div className={`w-10 h-10 rounded-2xl flex-shrink-0 flex items-center justify-center ${msg.role === "user" ? "bg-white/10" : "glass"}`}>
                       {msg.role === "user" ? (
                         <User className="w-5 h-5" />
@@ -483,9 +516,25 @@ export default function Chat() {
                         />
                       )}
                     </div>
-                    <div className={`p-6 rounded-[2rem] leading-relaxed text-lg ${msg.role === "user" ? "bg-white text-black font-medium" : "glass"}`}>
-                      {msg.content}
-                    </div>
+                    {msg.role === "user" ? (
+                      <div className="p-5 rounded-[2rem] leading-relaxed text-base bg-white/10 text-white font-medium break-words">
+                        {msg.content}
+                      </div>
+                    ) : (
+                      <div className="py-2 leading-relaxed text-base text-white/90 font-normal flex-1 min-w-0">
+                         {msg.isNew ? <TypingEffect content={msg.content} speed={12} /> : <span className="whitespace-pre-wrap block">{msg.content}</span>}
+                         <div className="flex items-center gap-1 mt-4 opacity-50 hover:opacity-100 transition-opacity">
+                           <button title="Kopyala" onClick={() => navigator.clipboard.writeText(msg.content)} className="flex flex-shrink-0 items-center justify-center w-8 h-8 rounded-lg text-white hover:bg-white/10 transition-colors">
+                              <Copy className="w-4 h-4" />
+                           </button>
+                           {i === messages.length - 1 && messages.length > 1 && messages[i-1]?.role === "user" && (
+                             <button title="Yeniden Oluştur" onClick={() => handleSend(undefined, messages[i-1].content)} className="flex flex-shrink-0 items-center justify-center w-8 h-8 rounded-lg text-white hover:bg-white/10 transition-colors">
+                                <RefreshCcw className="w-4 h-4" />
+                             </button>
+                           )}
+                         </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
