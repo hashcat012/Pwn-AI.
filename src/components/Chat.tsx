@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, User, Bot, LogOut, MessageSquare, Plus, Settings, Search, ChevronLeft, Menu, MoreHorizontal, Trash, Pin, Edit2, Copy, RefreshCcw } from "lucide-react";
-import { PanelLeftIcon } from "hugeicons-react";
+import { Send, User, Bot, LogOut, MessageSquare, Plus, Settings, Search, ChevronLeft, Menu, MoreHorizontal, Trash, Pin, Edit2, Copy, RefreshCcw, X, Square } from "lucide-react";
+import { PanelLeftIcon, CircleArrowUp02Icon } from "hugeicons-react";
 import { supabase } from "../lib/supabase";
 
 interface Message {
@@ -56,6 +56,15 @@ export default function Chat() {
   const [mobileVisibleId, setMobileVisibleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [dropdownId, setDropdownId] = useState<string | null>(null);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState("Genel");
+  const activeRequestRef = useRef<string | null>(null);
+
+  const handleStop = () => {
+    activeRequestRef.current = null;
+    setLoading(false);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -97,42 +106,6 @@ export default function Chat() {
       await supabase.from('chats').update({ title: newTitle }).eq('id', chatId);
     } catch (err) {
       if (user) fetchHistory(user.id);
-    }
-  };
-
-  const generateTitle = async (prompt: string, chatId: string, userId: string) => {
-    try {
-      const response = await (window as any).puter.ai.chat(
-        `Aşağıdaki mesajı özetleyen 3-4 kelimelik çok kısa, sade ve noktalama işareti içermeyen bir başlık yaz. Sadece başlığı ver:\n\n${prompt}`,
-        { model: "gpt-4o-mini" }
-      );
-      let title = "";
-      if (typeof response === 'string') {
-        title = response;
-      } else if (response) {
-        if (typeof response.text === "string") {
-          title = response.text;
-        } else if (response.message) {
-          if (typeof response.message === "string") title = response.message;
-          else if (typeof response.message.content === "string") title = response.message.content;
-          else if (Array.isArray(response.message.content)) title = response.message.content.map((c: any) => c?.text || "").join("");
-        } else if (typeof response.content === "string") {
-          title = response.content;
-        } else if (typeof response.extra_content === "string") {
-          title = response.extra_content;
-        }
-      }
-
-      let titleStr = String(title || prompt || "Yeni Sohbet").replace(/['"]/g, '').trim();
-      if (titleStr.length > 40) titleStr = titleStr.slice(0, 40) + "...";
-      if (titleStr.toLowerCase().startsWith("başlık:")) titleStr = titleStr.substring(7).trim();
-      titleStr = titleStr.charAt(0).toUpperCase() + titleStr.slice(1);
-      if (titleStr) {
-        await supabase.from('chats').update({ title: titleStr }).eq('id', chatId);
-        fetchHistory(userId);
-      }
-    } catch (e) {
-      console.error("Title generation failed:", e);
     }
   };
 
@@ -251,9 +224,20 @@ export default function Chat() {
       if (user) {
         try {
           if (!chatId) {
+            let titleStr = textToSend.split(" ").slice(0, 3).join(" ").replace(/['"]/g, '').trim();
+            try {
+               const response = await (window as any).puter.ai.chat(`Aşağıdaki mesaja en fazla 3 kelimelik başlık yaz:\n\n${textToSend}`, {model:"gpt-4o-mini"});
+               let temp = typeof response === 'string' ? response : (response?.text || response?.message?.content || response?.message || "");
+               temp = String(temp).replace(/['"]/g, '').trim();
+               if (temp) {
+                   if (temp.toLowerCase().startsWith("başlık:")) temp = temp.substring(7).trim();
+                   titleStr = temp.charAt(0).toUpperCase() + temp.slice(1);
+               } 
+            } catch(e) {}
+
             const { data: newChat, error: chatError } = await supabase
               .from('chats')
-              .insert([{ user_id: user.id, title: "Yeni Sohbet" }])
+              .insert([{ user_id: user.id, title: titleStr }])
               .select()
               .single();
 
@@ -261,7 +245,6 @@ export default function Chat() {
               chatId = newChat.id;
               setActiveChatId(chatId);
               fetchHistory(user.id);
-              generateTitle(textToSend, chatId, user.id);
             }
           }
 
@@ -275,6 +258,9 @@ export default function Chat() {
 
       // Use Puter.js directly for Gemini, Claude, GPT (browser-based, no auth token needed)
       let assistantContent: string;
+      const reqId = Date.now().toString();
+      activeRequestRef.current = reqId;
+
       if (selectedModel.id.includes("gemini") || selectedModel.id.includes("claude") || selectedModel.id.includes("gpt-5.4")) {
         try {
           let puterModel = "gpt-4o-mini";
@@ -327,6 +313,8 @@ export default function Chat() {
           throw new Error("No content in response");
         }
       }
+
+      if (activeRequestRef.current !== reqId) return;
 
       const assistantMessage: Message = { role: "assistant", content: assistantContent, modelId: selectedModel.id, isNew: true };
       setMessages((prev) => [...prev, assistantMessage]);
@@ -448,8 +436,8 @@ export default function Chat() {
         </div>
 
         {/* Profile Section */}
-        <div className="p-4 border-t border-white/5 bg-[#0F0F0F]">
-          <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
+        <div className="p-4 border-t border-white/5 bg-[#0F0F0F] relative">
+          <div onClick={() => setProfileDropdownOpen(!profileDropdownOpen)} className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
             <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10">
               {user?.user_metadata?.avatar_url ? (
                 <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -463,10 +451,23 @@ export default function Chat() {
               <div className="text-sm font-bold truncate">{user?.email?.split('@')[0] || "User"}</div>
               <div className="text-[10px] text-white/40 truncate">{user?.email}</div>
             </div>
-            <button onClick={handleLogout} className="p-2 opacity-0 group-hover:opacity-100 hover:bg-white/10 rounded-lg transition-all">
-              <LogOut className="w-4 h-4 text-white/40" />
+            <button onClick={(e) => { e.stopPropagation(); setProfileDropdownOpen(!profileDropdownOpen); }} className="p-2 opacity-0 group-hover:opacity-100 hover:bg-white/10 rounded-lg transition-all">
+              <Settings className="w-4 h-4 text-white/40 group-hover:text-white" />
             </button>
           </div>
+          
+          <AnimatePresence>
+            {profileDropdownOpen && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-full left-4 mb-2 w-64 bg-[#1A1A1A] border border-white/10 rounded-xl shadow-2xl p-1 z-50">
+                 <button onClick={() => {setSettingsOpen(true); setProfileDropdownOpen(false);}} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 rounded-lg text-sm text-white/80 hover:text-white">
+                   <Settings className="w-4 h-4" /> Ayarlar
+                 </button>
+                 <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-red-500/10 text-red-500 rounded-lg text-sm mt-1">
+                   <LogOut className="w-4 h-4" /> Çıkış Yap
+                 </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.aside>
 
@@ -551,14 +552,16 @@ export default function Chat() {
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex gap-6 mb-8"
+                  className="flex gap-6 mb-8 justify-start"
                 >
-                  <div className="w-10 h-10 rounded-2xl glass flex items-center justify-center">
-                    <img src={selectedModel.logo} alt="" className="w-6 h-6 rounded-sm object-contain" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="p-6 rounded-[2rem] glass flex items-center gap-4">
-                    <span className="text-white/60 font-medium">Düşünülüyor</span>
-                    <span className="loader" />
+                  <div className={`flex gap-4 w-full max-w-[85%] flex-row`}>
+                    <div className="w-10 h-10 rounded-2xl glass flex flex-shrink-0 items-center justify-center">
+                      <img src={selectedModel.logo} alt="" className="w-6 h-6 rounded-sm object-contain" referrerPolicy="no-referrer" />
+                    </div>
+                    <div className="py-2 flex items-center gap-3">
+                      <span className="text-white/50 text-sm font-medium animate-pulse">Pwn AI düşünüyor</span>
+                      <span className="loader scale-75" />
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -624,13 +627,23 @@ export default function Chat() {
                   </AnimatePresence>
                 </div>
 
-                <button 
-                  type="submit"
-                  disabled={!input.trim() || loading}
-                  className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center hover:bg-white/90 transition-all disabled:opacity-50 disabled:scale-90 shadow-lg"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+                {loading ? (
+                  <button 
+                    onClick={handleStop}
+                    type="button"
+                    className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-all flex-shrink-0 shadow-lg"
+                  >
+                    <Square className="w-4 h-4 fill-current" />
+                  </button>
+                ) : (
+                  <button 
+                    type="submit"
+                    disabled={!input.trim()}
+                    className="w-10 h-10 flex items-center justify-center transition-all disabled:opacity-50 disabled:scale-95 flex-shrink-0 text-white hover:text-white/80 group"
+                  >
+                    <CircleArrowUp02Icon className="w-9 h-9" strokeWidth={1} />
+                  </button>
+                )}
               </div>
             </div>
           </form>
@@ -640,6 +653,81 @@ export default function Chat() {
         </p>
       </div>
       </div>
+
+      <AnimatePresence>
+        {settingsOpen && (
+          <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{opacity: 0, scale: 0.95}} animate={{opacity:1, scale:1}} exit={{opacity: 0, scale: 0.95}} className="bg-[#0A0A0A] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[80vh] flex overflow-hidden shadow-2xl relative">
+              <button onClick={() => setSettingsOpen(false)} className="absolute top-4 right-4 p-2 text-white/50 hover:bg-white/10 rounded-full z-10 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+              <div className="w-48 sm:w-64 border-r border-white/5 p-4 flex flex-col gap-2">
+                  <h3 className="font-bold mb-4 ml-2 mt-2">Ayarlar</h3>
+                  {["Genel", "Yapay Zeka", "Güvenlik"].map(tab => (
+                    <button key={tab} onClick={() => setSettingsTab(tab)} className={`text-left px-3 py-2 rounded-lg text-sm font-medium transition-all ${settingsTab === tab ? "bg-white/10 text-white" : "text-white/40 hover:bg-white/5"}`}>
+                        {tab}
+                    </button>
+                  ))}
+              </div>
+              <div className="flex-1 p-8 overflow-y-auto w-full">
+                  {settingsTab === "Genel" && (
+                    <motion.div initial={{opacity:0, x: 10}} animate={{opacity:1, x:0}} className="space-y-6">
+                        <div>
+                          <label className="block text-sm font-bold text-white/70 mb-2">Görünen Ad</label>
+                          <input type="text" placeholder={user?.email?.split('@')[0]} className="w-full bg-white/5 border border-white/10 p-3 rounded-xl focus:border-white/30 text-white outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-white/70 mb-2">Tema</label>
+                          <select className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white outline-none">
+                            <option value="dark" className="bg-[#0A0A0A]">Karanlık Tema</option>
+                            <option value="light" className="bg-[#0A0A0A]">Aydınlık Tema</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-white/70 mb-2">Dil</label>
+                          <select className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white outline-none">
+                            <option value="tr" className="bg-[#0A0A0A]">Türkçe</option>
+                            <option value="en" className="bg-[#0A0A0A]">English</option>
+                            <option value="fr" className="bg-[#0A0A0A]">Français</option>
+                            <option value="es" className="bg-[#0A0A0A]">Español</option>
+                            <option value="ru" className="bg-[#0A0A0A]">Русский</option>
+                            <option value="cn" className="bg-[#0A0A0A]">中文</option>
+                          </select>
+                        </div>
+                    </motion.div>
+                  )}
+                  {settingsTab === "Yapay Zeka" && (
+                    <motion.div initial={{opacity:0, x: 10}} animate={{opacity:1, x:0}} className="space-y-6">
+                        <div>
+                          <label className="block text-sm font-bold text-white/70 mb-2">Sistem Komutu (System Prompt)</label>
+                          <textarea rows={4} placeholder="Yapay zeka için özel davranış veya karakter talimatı girin..." className="w-full bg-white/5 border border-white/10 p-3 rounded-xl focus:border-white/30 text-white resize-none outline-none" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-white/70 mb-2">Hazır Kişilikler</label>
+                          <select className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white outline-none">
+                            <option className="bg-[#0A0A0A]">Standart Asistan</option>
+                            <option className="bg-[#0A0A0A]">Yazılımcı / Hacker</option>
+                            <option className="bg-[#0A0A0A]">Kibar ve Resmi</option>
+                            <option className="bg-[#0A0A0A]">Uzman Çevirmen</option>
+                          </select>
+                        </div>
+                    </motion.div>
+                  )}
+                  {settingsTab === "Güvenlik" && (
+                    <motion.div initial={{opacity:0, x: 10}} animate={{opacity:1, x:0}} className="space-y-6">
+                        <div>
+                          <label className="block text-sm font-bold text-white/70 mb-2">Yeni Şifre</label>
+                          <input type="password" placeholder="Yeni şifrenizi girin" className="w-full bg-white/5 border border-white/10 p-3 rounded-xl mb-3 focus:border-white/30 text-white outline-none" />
+                          <input type="password" placeholder="Yeni şifrenizi tekrar girin" className="w-full bg-white/5 border border-white/10 p-3 rounded-xl focus:border-white/30 text-white outline-none" />
+                          <button className="mt-4 px-6 py-2.5 bg-white text-black font-bold text-sm rounded-xl hover:bg-white/90 w-full transition-all">Şifreyi Güncelle</button>
+                        </div>
+                    </motion.div>
+                  )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
