@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, User, Bot, LogOut, MessageSquare, Plus, Settings, Search, ChevronLeft, Menu } from "lucide-react";
+import { Send, User, Bot, LogOut, MessageSquare, Plus, Settings, Search, ChevronLeft, Menu, MoreHorizontal, Trash, Pin, Edit2 } from "lucide-react";
+import { PanelLeftIcon } from "hugeicons-react";
 import { supabase } from "../lib/supabase";
 
 interface Message {
@@ -35,6 +36,97 @@ export default function Chat() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [history, setHistory] = useState<ChatHistory[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const modelSelectorRef = useRef<HTMLDivElement>(null);
+  const touchTimer = useRef<any>(null);
+  const [mobileVisibleId, setMobileVisibleId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dropdownId, setDropdownId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modelSelectorRef.current && !modelSelectorRef.current.contains(event.target as Node)) {
+        setShowModelSelector(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("click", () => setDropdownId(null));
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("click", () => setDropdownId(null));
+    };
+  }, []);
+
+  const togglePin = async (chatId: string, currentPinned: boolean) => {
+    const nextPinned = !currentPinned;
+    setDropdownId(null);
+    setHistory(prev => {
+       const mapped = prev.map(c => c.id === chatId ? { ...c, pinned: nextPinned } : c);
+       return mapped.sort((a: any, b: any) => {
+          if (a.pinned && !b.pinned) return -1;
+          if (!a.pinned && b.pinned) return 1;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+       });
+    });
+    try {
+      const { error } = await supabase.from('chats').update({ pinned: nextPinned }).eq('id', chatId);
+      if (error) console.error("Pin error, probably missing 'pinned' column in db", error);
+    } catch (err) { }
+  };
+
+  const renameChat = async (chatId: string, oldTitle: string) => {
+    setDropdownId(null);
+    const newTitle = prompt("Sohbete yeni bir isim verin:", oldTitle);
+    if (!newTitle || newTitle === oldTitle) return;
+    setHistory(prev => prev.map(c => c.id === chatId ? { ...c, title: newTitle } : c));
+    try {
+      await supabase.from('chats').update({ title: newTitle }).eq('id', chatId);
+    } catch (err) {
+      if (user) fetchHistory(user.id);
+    }
+  };
+
+  const generateTitle = async (prompt: string, chatId: string, userId: string) => {
+    try {
+      const response = await (window as any).puter.ai.chat(
+        `Aşağıdaki mesajı özetleyen 3-4 kelimelik çok kısa, sade ve noktalama işareti içermeyen bir başlık yaz. Sadece başlığı ver:\n\n${prompt}`,
+        { model: "gpt-4o-mini" }
+      );
+      let title = "";
+      if (typeof response === 'string') title = response;
+      else if (response?.message?.content && Array.isArray(response.message.content)) title = response.message.content.map((c: any) => c?.text || "").join("");
+      else if (response?.content) title = response.content;
+      else if (response?.message) title = response.message;
+      else if (response?.text) title = response.text;
+      else if (response?.extra_content) title = response.extra_content;
+
+      title = title.replace(/['"]/g, '').trim();
+      if (title.length > 40) title = title.slice(0, 40) + "...";
+      if (title.toLowerCase().startsWith("başlık:")) title = title.substring(7).trim();
+      if (title) {
+        await supabase.from('chats').update({ title }).eq('id', chatId);
+        fetchHistory(userId);
+      }
+    } catch (e) {
+      console.error("Title generation failed:", e);
+    }
+  };
+
+  const deleteChat = async (chatId: string) => {
+    if (!confirm("Bu sohbeti silmek istediğinize emin misiniz?")) return;
+    setDropdownId(null);
+    setHistory((prev) => prev.filter(c => c.id !== chatId));
+    if (activeChatId === chatId) {
+      startNewChat();
+    }
+    try {
+      await supabase.from('messages').delete().eq('chat_id', chatId);
+      await supabase.from('chats').delete().eq('id', chatId);
+    } catch (err) {
+      console.error("Failed to delete chat", err);
+      if (user) fetchHistory(user.id);
+    }
+  };
+
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -70,7 +162,14 @@ export default function Chat() {
       setHistory([]);
       return;
     }
-    if (data) setHistory(data);
+    if (data) {
+      const sorted = data.sort((a: any, b: any) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      setHistory(sorted);
+    }
   };
 
   const loadChat = async (chatId: string) => {
@@ -129,6 +228,7 @@ export default function Chat() {
               chatId = newChat.id;
               setActiveChatId(chatId);
               fetchHistory(user.id);
+              generateTitle(input, chatId, user.id);
             }
           }
 
@@ -144,28 +244,33 @@ export default function Chat() {
       let assistantContent: string;
       if (selectedModel.id.includes("gemini") || selectedModel.id.includes("claude") || selectedModel.id.includes("gpt-5.4")) {
         try {
+          let puterModel = "gpt-4o-mini";
+          if (selectedModel.id.includes("gpt")) puterModel = "gpt-4o";
+          else if (selectedModel.id.includes("claude")) puterModel = "claude-3-5-sonnet";
+          
           const response = await (window as any).puter.ai.chat(input, {
-            model: selectedModel.id
+            model: puterModel
           });
           // Puter.js returns {content, extra_content, role} or {message: {content: [...]}}
           let extractedContent: string;
           if (typeof response === 'string') {
             extractedContent = response;
           } else if (response?.message?.content && Array.isArray(response.message.content)) {
-            // Claude format: {message: {content: [{text: "..."}]}}
             extractedContent = response.message.content.map((c: any) => c?.text || "").join("");
           } else if (response?.content && typeof response.content === 'string') {
             extractedContent = response.content;
           } else if (response?.message && typeof response.message === 'string') {
             extractedContent = response.message;
+          } else if (response?.text && typeof response.text === 'string') {
+            extractedContent = response.text;
           } else if (response?.extra_content && typeof response.extra_content === 'string') {
             extractedContent = response.extra_content;
           } else {
             extractedContent = String(response);
           }
           assistantContent = extractedContent;
-        } catch (puterError) {
-          throw new Error("Puter.js failed: " + (puterError as Error).message);
+        } catch (puterError: any) {
+          throw new Error("Puter.js failed: " + (puterError?.message || JSON.stringify(puterError)));
         }
       } else {
         // Use backend for other models (OpenRouter)
@@ -238,23 +343,73 @@ export default function Chat() {
           </button>
         </div>
 
+        <div className="px-4 mb-4 relative">
+          <Search className="w-4 h-4 absolute left-8 top-1/2 -translate-y-1/2 text-white/40" />
+          <input 
+            type="text"
+            placeholder="Sohbetlerde ara..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-white/20 transition-all text-white placeholder:text-white/30"
+          />
+        </div>
+
         <div className="flex-1 overflow-y-auto px-4 space-y-1">
           <div className="text-[10px] font-bold uppercase tracking-widest text-white/20 px-4 mb-2">History</div>
           {history.length === 0 ? (
             <div className="px-4 py-8 text-center text-xs text-white/20">No chats yet</div>
           ) : (
-            history.map((item) => (
-              <button 
+            history.filter((h) => h.title.toLowerCase().includes(searchQuery.toLowerCase())).map((item) => (
+              <div 
                 key={item.id} 
+                className={`w-full flex items-center px-2 py-2 rounded-xl transition-colors text-left group relative cursor-pointer ${activeChatId === item.id ? "bg-white/10" : "hover:bg-white/5"}`}
+                onTouchStart={() => {
+                  touchTimer.current = setTimeout(() => setMobileVisibleId(item.id), 500);
+                }}
+                onTouchEnd={() => {
+                  if (touchTimer.current) clearTimeout(touchTimer.current);
+                }}
+                onTouchMove={() => {
+                  if (touchTimer.current) clearTimeout(touchTimer.current);
+                }}
                 onClick={() => loadChat(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-left group ${activeChatId === item.id ? "bg-white/10" : "hover:bg-white/5"}`}
               >
-                <MessageSquare className="w-4 h-4 text-white/20 group-hover:text-white/60" />
-                <div className="flex-1 truncate">
-                  <div className="text-sm font-medium truncate">{item.title}</div>
+                <div className="flex-1 truncate px-2 text-left">
+                  <div className="text-sm font-medium truncate flex items-center gap-2">
+                    {(item as any).pinned && <Pin className="w-3 h-3 text-white/60" />}
+                    {item.title}
+                  </div>
                   <div className="text-[10px] text-white/20">{new Date(item.created_at).toLocaleDateString()}</div>
                 </div>
-              </button>
+                <div className="relative">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDropdownId(dropdownId === item.id ? null : item.id); }}
+                    className={`p-2 rounded-lg hover:bg-white/10 text-white/40 hover:text-white transition-all ${dropdownId === item.id || activeChatId === item.id || mobileVisibleId === item.id ? "opacity-100" : "opacity-0 group-hover:opacity-100 md:opacity-0 active:opacity-100"}`}
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                  <AnimatePresence>
+                    {dropdownId === item.id && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="absolute right-0 top-10 bg-[#1A1A1A] border border-white/10 rounded-xl shadow-2xl z-50 w-44 overflow-hidden flex flex-col py-1"
+                      >
+                        <button onClick={(e) => { e.stopPropagation(); togglePin(item.id, !!(item as any).pinned); }} className="px-3 py-2 text-xs text-white/80 hover:bg-white/5 hover:text-white text-left flex items-center gap-3">
+                          <Pin className="w-4 h-4" /> {(item as any).pinned ? "Sabitlemeyi Kaldır" : "Sohbeti Sabitle"}
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); renameChat(item.id, item.title); }} className="px-3 py-2 text-xs text-white/80 hover:bg-white/5 hover:text-white text-left flex items-center gap-3">
+                          <Edit2 className="w-4 h-4" /> Yeniden Adlandır
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); deleteChat(item.id); }} className="px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 text-left flex items-center gap-3">
+                          <Trash className="w-4 h-4" /> Sohbeti Sil
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
             ))
           )}
         </div>
@@ -264,9 +419,11 @@ export default function Chat() {
           <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group">
             <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden border border-white/10">
               {user?.user_metadata?.avatar_url ? (
-                <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                <img src={user.user_metadata.avatar_url} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                <User className="w-5 h-5 text-white/40" />
+                <div className="w-full h-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs uppercase">
+                  {user?.email ? user.email.charAt(0) : <User className="w-5 h-5 text-white/40" />}
+                </div>
               )}
             </div>
             <div className="flex-1 min-w-0">
@@ -287,7 +444,7 @@ export default function Chat() {
             onClick={() => setSidebarOpen(true)}
             className="absolute top-6 left-6 z-20 p-2 glass rounded-lg hover:bg-white/10 transition-all"
           >
-            <Menu className="w-5 h-5" />
+            <PanelLeftIcon className="w-5 h-5" />
           </button>
         )}
 
@@ -301,9 +458,7 @@ export default function Chat() {
                   animate={{ opacity: 1, y: 0 }}
                   className="h-[70vh] flex flex-col items-center justify-center text-center"
                 >
-                  <div className="w-20 h-20 rounded-3xl glass flex items-center justify-center mb-8">
-                    <Bot className="w-10 h-10 text-white/80" />
-                  </div>
+
                   <h2 className="text-4xl font-bold mb-4 tracking-tight">How can I help you today?</h2>
                   <p className="text-white/40 max-w-md mx-auto">Start a conversation with Pwn AI. Powered by {selectedModel.name} for lightning fast responses.</p>
                 </motion.div>
@@ -366,7 +521,7 @@ export default function Chat() {
       <div className="p-6 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A] to-transparent">
         <div className="max-w-4xl mx-auto relative group">
           <form onSubmit={handleSend} className="relative">
-            <div className="flex flex-col bg-white/5 border border-white/10 rounded-2xl focus-within:border-white/20 transition-all shadow-2xl">
+            <div className="flex flex-col bg-white/5 border border-white/10 rounded-2xl focus-within:border-white/20 transition-all shadow-2xl" ref={modelSelectorRef}>
               <input 
                 type="text"
                 value={input}
