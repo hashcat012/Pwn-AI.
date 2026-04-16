@@ -263,11 +263,11 @@ export default function Chat() {
       // Try to save to Supabase but don't block if it fails
       if (user) {
         try {
-          if (!chatId) {
+          if (!chatId && user) {
             const { data: newChat, error: chatError } = await supabase
               .from('chats')
               .insert([{ user_id: user.id, title: content.slice(0, 30) + "..." }])
-              .select()
+              .select('id')
               .single();
 
             if (!chatError && newChat) {
@@ -279,7 +279,7 @@ export default function Chat() {
             }
           }
 
-          if (chatId) {
+          if (chatId && user) {
             const { error: msgError } = await supabase.from('messages').insert([{ chat_id: chatId, user_id: user.id, role: 'user', content: content }]);
             if (msgError) console.warn("Message save failed:", msgError.message);
           }
@@ -355,9 +355,6 @@ export default function Chat() {
     } catch (err: any) {
       console.error("Chat Error:", err);
       let errorMsg = err.message || "Something went wrong.";
-      if (errorMsg.includes("401") || errorMsg.includes("Unauthorized") || errorMsg.includes("MISSING_API_KEY")) {
-        errorMsg = "API key not configured. Please add OPENROUTER_API_KEY to your .env file.";
-      }
       setError(errorMsg);
     } finally {
       setLoading(false);
@@ -700,13 +697,26 @@ export default function Chat() {
                     </AnimatePresence>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={!input.trim() || loading}
-                    className="w-10 h-10 rounded-xl bg-white flex items-center justify-center hover:bg-white/90 transition-all disabled:opacity-50 disabled:scale-90 shadow-lg"
-                  >
-                    <CircleArrowUp02Icon className="w-6 h-6 text-black" fill="white" />
-                  </button>
+                  {loading ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoading(false);
+                        setError("Stopped by user");
+                      }}
+                      className="w-10 h-10 rounded-full bg-white flex items-center justify-center hover:bg-white/90 transition-all shadow-lg"
+                    >
+                      <div className="w-3 h-3 bg-black rounded-sm" />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={!input.trim()}
+                      className="w-10 h-10 rounded-full bg-white flex items-center justify-center hover:bg-white/90 transition-all disabled:opacity-50 disabled:scale-90 shadow-lg"
+                    >
+                      <CircleArrowUp02Icon className="w-6 h-6 text-black" fill="white" />
+                    </button>
+                  )}
                 </div>
               </div>
             </form>
