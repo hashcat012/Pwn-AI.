@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, User, Bot, LogOut, MessageSquare, Plus, Settings, Search, ChevronLeft, Menu, MoreVertical, Pin, Trash2, Edit3 } from "lucide-react";
+import { Copy01Icon, RedoIcon, CircleArrowUp02Icon, PanelLeftIcon } from "hugeicons-react";
 import { supabase } from "../lib/supabase";
 
 interface Message {
@@ -45,7 +46,7 @@ const HistoryItem = ({ item, isActive, isPinned, onLoad, onDelete, onPin, onRena
         </div>
       </button>
 
-      <div ref={menuRef} className={`${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity pr-2`}>
+      <div ref={menuRef} className={`${isActive || showMenu ? "opacity-100" : "opacity-0 group-hover:opacity-100"} transition-opacity pr-2`}>
         <button
           onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
           className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
@@ -242,15 +243,18 @@ export default function Chat() {
 
   const [error, setError] = useState<string | null>(null);
 
-  const handleSend = async (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent, messageContent?: string) => {
     e.preventDefault();
-    if (!input.trim() || loading) return;
+    const content = messageContent || input;
+    if (!content.trim() || loading) return;
     setError(null);
 
-    const userMessage: Message = { role: "user", content: input };
+    const userMessage: Message = { role: "user", content };
     const currentMessages = [...messages, userMessage];
-    setMessages(currentMessages);
-    setInput("");
+    if (!messageContent) {
+      setMessages(currentMessages);
+      setInput("");
+    }
     setLoading(true);
 
     try {
@@ -262,7 +266,7 @@ export default function Chat() {
           if (!chatId) {
             const { data: newChat, error: chatError } = await supabase
               .from('chats')
-              .insert([{ user_id: user.id, title: input.slice(0, 30) + "..." }])
+              .insert([{ user_id: user.id, title: content.slice(0, 30) + "..." }])
               .select()
               .single();
 
@@ -276,7 +280,7 @@ export default function Chat() {
           }
 
           if (chatId) {
-            const { error: msgError } = await supabase.from('messages').insert([{ chat_id: chatId, user_id: user.id, role: 'user', content: input }]);
+            const { error: msgError } = await supabase.from('messages').insert([{ chat_id: chatId, user_id: user.id, role: 'user', content: content }]);
             if (msgError) console.warn("Message save failed:", msgError.message);
           }
         } catch (dbErr: any) {
@@ -288,7 +292,7 @@ export default function Chat() {
       let assistantContent: string;
       if (selectedModel.id.includes("gemini") || selectedModel.id.includes("claude") || selectedModel.id.includes("gpt-5.4")) {
         try {
-          const response = await (window as any).puter.ai.chat(input, {
+          const response = await (window as any).puter.ai.chat(content, {
             model: selectedModel.id
           });
           // Puter.js returns {content, extra_content, role} or {message: {content: [...]}}
@@ -317,7 +321,9 @@ export default function Chat() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            messages: currentMessages,
+            messages: messageContent 
+              ? [{ role: "user", content: messageContent }]
+              : currentMessages,
             model: selectedModel.id
           }),
         });
@@ -356,6 +362,31 @@ export default function Chat() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  const handleRegenerate = (messageIndex: number) => {
+    // Find the user message before this assistant message
+    let userMessageIndex = messageIndex - 1;
+    while (userMessageIndex >= 0 && messages[userMessageIndex].role !== "user") {
+      userMessageIndex--;
+    }
+    
+    if (userMessageIndex < 0) return;
+    
+    const userMessage = messages[userMessageIndex];
+    
+    // Remove all messages from the assistant message onwards
+    const newMessages = messages.slice(0, messageIndex);
+    setMessages(newMessages);
+    
+    // Trigger new response
+    setTimeout(() => {
+      handleSend({ preventDefault: () => {} } as React.FormEvent, userMessage.content);
+    }, 0);
   };
 
   const handleLogout = async () => {
@@ -417,7 +448,7 @@ export default function Chat() {
             <div className="text-xl font-bold tracking-tighter">Pwn AI.</div>
           </div>
           <button className="p-2 hover:bg-white/5 rounded-lg transition-colors">
-            <ChevronLeft className="w-5 h-5 text-white/40" />
+            <PanelLeftIcon className="w-5 h-5 text-white/40" />
           </button>
         </div>
 
@@ -526,8 +557,7 @@ export default function Chat() {
                       </svg>
                     </div>
                   <h2 className="text-4xl font-bold mb-4 tracking-tight">How can I help you today?</h2>
-                  <p className="text-white/40 max-w-md mx-auto">Start a conversation with Pwn AI. Powered by {selectedModel.name} for lightning fast responses.</p>
-                </motion.div>
+                                  </motion.div>
               )}
               {messages.map((msg, i) => (
                 <motion.div
@@ -548,9 +578,39 @@ export default function Chat() {
                         />
                       )}
                     </div>
-                    <div className={`p-6 rounded-[2rem] leading-relaxed text-lg ${msg.role === "user" ? "bg-white text-black font-medium" : "glass"}`}>
-                      {msg.content}
-                    </div>
+                    {msg.role === "user" ? (
+                      // User message bubble - pill if single line, rounded if multi
+                      <div className={`bg-white text-black font-medium leading-relaxed text-lg whitespace-pre-wrap ${
+                        msg.content.includes('\n') || msg.content.length > 50
+                          ? 'rounded-2xl px-4 py-3' 
+                          : 'rounded-full px-4 py-2'
+                      }`}>
+                        {msg.content}
+                      </div>
+                    ) : (
+                      // AI response - no bubble, with action buttons
+                      <div className="flex flex-col gap-2">
+                        <div className="leading-relaxed text-lg text-white/90">
+                          {msg.content}
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => handleCopy(msg.content)}
+                            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
+                            title="Copy"
+                          >
+                            <Copy01Icon className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleRegenerate(i)}
+                            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
+                            title="Regenerate"
+                          >
+                            <RedoIcon className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -643,18 +703,15 @@ export default function Chat() {
                   <button
                     type="submit"
                     disabled={!input.trim() || loading}
-                    className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center hover:bg-white/90 transition-all disabled:opacity-50 disabled:scale-90 shadow-lg"
+                    className="w-10 h-10 rounded-xl bg-white flex items-center justify-center hover:bg-white/90 transition-all disabled:opacity-50 disabled:scale-90 shadow-lg"
                   >
-                    <Send className="w-4 h-4" />
+                    <CircleArrowUp02Icon className="w-6 h-6 text-black" fill="white" />
                   </button>
                 </div>
               </div>
             </form>
           </div>
-          <p className="text-center text-[10px] text-white/20 mt-4 uppercase tracking-widest font-bold">
-            Pwn AI is powered by {selectedModel.name}.
-          </p>
-        </div>
+                  </div>
       </div>
     </div>
   );
