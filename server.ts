@@ -34,6 +34,8 @@ async function listenWithFallback(app: express.Express, startPort: number) {
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
+  // Use a port based on the server port to avoid conflicts
+  const HMR_PORT = PORT + 24700;
 
   app.use(express.json());
 
@@ -45,10 +47,10 @@ async function startServer() {
       (typeof req.headers.referer === "string" && req.headers.referer) ||
       process.env.APP_URL ||
       "http://localhost:3000";
-    
+
     // Safety: ensure no extra whitespace in referer
     const safeReferer = String(referer).trim();
-    
+
     // 1) Gemini route via Google SDK (requires GEMINI_API_KEY)
     if (typeof model === "string" && model.includes("gemini")) {
       try {
@@ -96,21 +98,18 @@ async function startServer() {
 
     // 2. Handle via OpenRouter (Fallback or other models)
     let apiKey = process.env.OPENROUTER_API_KEY;
-    const hardcodedKey = "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";
-    
-    if (!apiKey || apiKey === "MY_OPENROUTER_API_KEY" || apiKey.length < 10) {
-      apiKey = hardcodedKey;
-    }
 
-    if (!apiKey) {
-      console.error("OpenRouter API Key missing!");
-      return res.status(500).json({ error: "OPENROUTER_API_KEY is not set" });
+    // Use hardcoded fallback key if env key is missing/invalid
+    const fallbackKey = "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";
+    if (!apiKey || apiKey === "MY_OPENROUTER_API_KEY" || apiKey.length < 20) {
+      console.warn("OpenRouter API Key missing or invalid, using fallback key");
+      apiKey = fallbackKey;
     }
     console.log(`Backend Using API Key starting with: ${apiKey.substring(0, 10)}...`);
 
     try {
       let targetModel = model || "openai/gpt-oss-120b:free";
-      
+
       const modelMapping: Record<string, string> = {
         "nvidia/nemotron-4-340b-instruct:free": "nvidia/nemotron-3-super-120b-a12b:free",
         "zhipu/glm-4-9b-chat:free": "z-ai/glm-4.5-air:free",
@@ -140,12 +139,12 @@ async function startServer() {
       });
 
       const data = await response.json();
-      
+
       if (!response.ok) {
         console.error(`OpenRouter Error ${response.status}:`, JSON.stringify(data));
         const errDetail = data?.error?.message || data?.error || JSON.stringify(data);
-        return res.status(response.status).json({ 
-          error: `OpenRouter API Error (${response.status})`, 
+        return res.status(response.status).json({
+          error: `OpenRouter API Error (${response.status})`,
           details: errDetail
         });
       }
@@ -163,6 +162,10 @@ async function startServer() {
       server: {
         middlewareMode: true,
         strictPort: false,
+        hmr: {
+          port: HMR_PORT,
+          clientPort: HMR_PORT,
+        },
       },
       appType: "spa",
     });
